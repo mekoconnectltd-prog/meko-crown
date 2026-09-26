@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(BUYER)
+  firstName    String?
+  lastName     String?
+  company      String?
+  kycStatus    KycStatus @default(PENDING)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  listings     Listing[]
+  deals        Deal[]
+}
+
+enum Role {
+  BUYER
+  SELLER
+  ADMIN
+}
+
+enum KycStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+model Listing {
+  id          String    @id @default(cuid())
+  sellerId    String
+  seller      User      @relation(fields: [sellerId], references: [id])
+  title       String
+  description String
+  assetType   AssetType
+  value       Decimal   @db.Decimal(14, 2)
+  location    String
+  noi         Decimal?  @db.Decimal(14, 2)
+  tenant      String?
+  leaseEnd    DateTime?
+  createdAt   DateTime  @default(now())
+
+  deals       Deal[]
+}
+
+enum AssetType {
+  EV_FLEET
+  COMMERCIAL_PROPERTY
+  EQUIPMENT
+}
+
+model Deal {
+  id               String     @id @default(cuid())
+  buyerId          String
+  buyer            User       @relation(fields: [buyerId], references: [id])
+  listingId        String
+  listing          Listing    @relation(fields: [listingId], references: [id])
+  status           DealStatus @default(DRAFT)
+  assetValue       Decimal    @db.Decimal(14, 2)
+  deposit          Decimal    @db.Decimal(14, 2)
+  financeAmount    Decimal    @db.Decimal(14, 2)
+  interestRate     Decimal    @db.Decimal(5, 2)
+  termMonths       Int
+  monthlyPayment   Decimal    @db.Decimal(14, 2)
+  coverageRatio    Decimal?   @db.Decimal(5, 2)
+  riskScore        Int?
+  decision         String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  payments         Payment[]
+  policy           InsurancePolicy?
+}
+
+enum DealStatus {
+  DRAFT
+  UNDERWRITING
+  APPROVED
+  REJECTED
+  ACTIVE
+  COMPLETED
+  DEFAULTED
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  dealId      String
+  deal        Deal          @relation(fields: [dealId], references: [id])
+  amount      Decimal       @db.Decimal(14, 2)
+  type        PaymentType
+  status      PaymentStatus @default(PENDING)
+  dueDate     DateTime
+  paidDate    DateTime?
+  stripeId    String?
+  createdAt   DateTime      @default(now())
+}
+
+enum PaymentType {
+  DEPOSIT
+  FINANCE
+  INSURANCE
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+  FAILED
+}
+
+model InsurancePolicy {
+  id           String   @id @default(cuid())
+  dealId       String   @unique
+  deal         Deal     @relation(fields: [dealId], references: [id])
+  policyNumber String   @unique
+  insurer      String
+  premium      Decimal  @db.Decimal(14, 2)
+  status       String   @default("ACTIVE")
+  startDate    DateTime
+  endDate      DateTime
+  createdAt    DateTime @default(now())
+}
