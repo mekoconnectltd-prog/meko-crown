@@ -1,0 +1,53 @@
+services:
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: meko-crown-api
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      JWT_SECRET: ${JWT_SECRET:-replace-with-a-random-string-of-at-least-32-characters}
+      AI_SERVICE_URL: http://ai:8001
+      DATABASE_URL: ${DATABASE_URL:-postgresql://user:password@host.docker.internal:5432/platform}
+    volumes:
+      - ./services/api:/app
+      - api_node_modules:/app/node_modules
+    command: npm run dev
+    depends_on:
+      ai:
+        condition: service_healthy
+    networks:
+      - meko-network
+    restart: unless-stopped
+
+  ai:
+    build:
+      context: ./services/ai
+      dockerfile: Dockerfile
+    container_name: meko-crown-ai
+    ports:
+      - "8001:8001"
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./services/ai:/app
+    command: python main.py
+    networks:
+      - meko-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+networks:
+  meko-network:
+    driver: bridge
+
+volumes:
+  api_node_modules:
